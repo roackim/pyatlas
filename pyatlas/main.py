@@ -72,18 +72,14 @@ def split_sprite_sheet_regions(sprite: SpriteSheet) -> list[SpriteSheet]:
     return split_units
 
 
-def main(*args, **kwargs):
-    
-    parser = argparse.ArgumentParser(description='Atlas compositor')
+def main(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(description="Atlas compositor")
 
-    # Add the arguments
-    parser.add_argument('-i', '--input_folder', type=str, help='The path to the input folder', required=True)
-    parser.add_argument('-r', '--res_output_folder', type=str, help='The path to the resource output folder', default="output")
-    parser.add_argument('-m', '--manifest_name', type=str, help='The lua manifest filename', default="atlas_regions.lua")
-    
+    parser.add_argument("-i", "--input_folder", type=str, required=True, help="Path to the input folder")
+    parser.add_argument("-r", "--res_output_folder", type=str, default="output", help="Path to the resource output folder")
+    parser.add_argument("-m", "--manifest_name", type=str, default="atlas_regions.lua", help="Lua manifest filename")
 
-    # Execute the parse_args() method
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     
     input_dir  = Path(args.input_folder)
     res_output_dir = Path(args.res_output_folder)
