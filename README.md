@@ -1,4 +1,4 @@
-# Pytalas
+# Pyatlas
 
 Aseprite to atlas tool — compact and metadata-aware.
 
