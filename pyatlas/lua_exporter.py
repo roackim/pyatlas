@@ -79,6 +79,9 @@ def _to_lua(value, indent: int = 0) -> str:
             return "{}"
         return "{ " + ", ".join(_to_lua(v, indent) for v in value) + " }"
 
+    if value is None:
+        return "nil"
+
     if isinstance(value, str):
         return f'"{value}"'
 

@@ -174,12 +174,12 @@ def extract_sheet_infos(json_path: str, png_path, key_stem: str, source_stem: st
                                     if cy > max_y: max_y = cy
                     
                     if min_x > max_x:  # no pixels
-                        min_x, min_y, max_x, max_y = 0, 0, 0, 0
-                        
-                    # w = max - min + 1 (since pixel coords are inclusive)
-                    out_w = (max_x - min_x + 1) if max_x >= min_x else 0
-                    out_h = (max_y - min_y + 1) if max_y >= min_y else 0
-                    sprite_sheet.hitboxes[region_key].add_frame(min_x, min_y, out_w, out_h)
+                        sprite_sheet.hitboxes[region_key].add_frame(None, None, None, None)
+                    else:
+                        # w = max - min + 1 (since pixel coords are inclusive)
+                        out_w = max_x - min_x + 1
+                        out_h = max_y - min_y + 1
+                        sprite_sheet.hitboxes[region_key].add_frame(min_x, min_y, out_w, out_h)
             continue
 
         if layer_name not in sprite_sheet.layer_order:

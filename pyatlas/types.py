@@ -61,8 +61,11 @@ class HitboxMeta:
         self.name = normalize_key_part(name)
         self.frames = []
 
-    def add_frame(self, x: int, y: int, w: int, h: int):
-        self.frames.append({"x": x, "y": y, "w": w, "h": h})
+    def add_frame(self, x, y, w, h):
+        if x is None:
+            self.frames.append(None)
+        else:
+            self.frames.append({"x": x, "y": y, "w": w, "h": h})
 
 class SpriteSheet:
     def __init__(self, key_stem: str, source_path: Path):
