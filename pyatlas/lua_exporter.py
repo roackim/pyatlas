@@ -88,6 +88,33 @@ def _to_lua(value, indent: int = 0) -> str:
     return str(value)
 
 
+def _hoist_durations_ms(value):
+    """
+    If every child of a dict is an animation-leaf dict (has durations_ms) and all
+    those lists are identical, hoist durations_ms to the parent and strip it from children.
+    Recurses depth-first so inner groups are hoisted before outer ones.
+    """
+    if not isinstance(value, dict):
+        return value
+
+    processed = {k: _hoist_durations_ms(v) for k, v in value.items()}
+
+    # Every child must be a dict that contains durations_ms
+    if not processed or not all(isinstance(v, dict) and "_durations_ms" in v for v in processed.values()):
+        return processed
+
+    # All durations_ms must be identical
+    all_durations = [v["_durations_ms"] for v in processed.values()]
+    if not all(d == all_durations[0] for d in all_durations[1:]):
+        return processed
+
+    # Hoist: put durations_ms on parent, remove from each child
+    result = {"_durations_ms": all_durations[0]}
+    for k, v in processed.items():
+        result[k] = {ck: cv for ck, cv in v.items() if ck != "_durations_ms"}
+    return result
+
+
 def _collapse_constants(value):
     """Recursively collapse dicts where all values are identical into {const = value}."""
     if not isinstance(value, dict):
@@ -133,11 +160,14 @@ def export_regions_lua(sprite_sheet_list: list[SpriteSheet], output_dir: Path, m
                 "w": layer.w,
                 "h": layer.h,
                 "n": layer.n,
-                "durations_ms": layer.durations_ms,
+                "_durations_ms": layer.durations_ms,
             },
         )
     for key, val in sorted_meta:
         _set_nested(nested_regions, key, val)
+
+    # Hoist identical durations_ms arrays from sibling layers to their parent group
+    nested_regions = _hoist_durations_ms(nested_regions)
 
     # Collapse constant values in metadata sections
     nested_regions = _collapse_constants(nested_regions)
