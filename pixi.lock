@@ -180,15 +180,6 @@ packages:
   - pkg:pypi/asttokens?source=hash-mapping
   size: 28797
   timestamp: 1763410017955
-- pypi: ./
-  name: atlas
-  version: 0.1.0
-  sha256: f93f64296e8ba0d095f58b5b4bad250717b978b96d4a67e590f97880852c3a18
-  requires_dist:
-  - numpy
-  - pillow
-  - pyinstaller
-  requires_python: '>=3.10'
 - conda: https://conda.anaconda.org/conda-forge/linux-64/brotli-1.2.0-hed03a55_1.conda
   sha256: e511644d691f05eb12ebe1e971fd6dc3ae55a4df5c253b4e1788b789bdf2dfa6
   md5: 8ccf913aaba749a5496c17629d859ed1
@@ -1284,6 +1275,15 @@ packages:
   - pkg:pypi/pure-eval?source=hash-mapping
   size: 16668
   timestamp: 1733569518868
+- pypi: ./
+  name: pyatlas
+  version: 0.1.0
+  sha256: 059252cdc06c06a66ebaff11e5a984adc3e0238b784419f445b39b783bf9e384
+  requires_dist:
+  - numpy
+  - pillow
+  - pyinstaller
+  requires_python: '>=3.10'
 - conda: https://conda.anaconda.org/conda-forge/noarch/pygments-2.20.0-pyhd8ed1ab_0.conda
   sha256: cf70b2f5ad9ae472b71235e5c8a736c9316df3705746de419b59d442e8348e86
   md5: 16c18772b340887160c79a6acc022db0

@@ -4,7 +4,7 @@ VENV_PYTHON := $(VENV_DIR)/bin/python
 PIP := $(VENV_PYTHON) -m pip
 PYINSTALLER := $(VENV_DIR)/bin/pyinstaller
 
-.PHONY: help venv install build clean distclean
+.PHONY: help venv install build clean distclean test
 
 help:
 	@echo "Targets:"
@@ -22,10 +22,14 @@ install: venv
 	$(PIP) install -r deps.txt
 
 build: install
-	$(PYINSTALLER) --noconfirm --clean --onefile --name atlas --distpath ./bin --workpath ./.pyinstaller atlas.py
+	$(PYINSTALLER) --noconfirm --clean --onefile --name atlas --distpath ./bin --workpath ./.pyinstaller pyatlas/main.py
 
 clean:
 	rm -rf bin build .pyinstaller atlas.spec __pycache__ atlas/__pycache__
+	rm -rf pyatlas.egg-info
+	
+test:
+	./bin/atlas -i test/test_data -o test/test_output
 
 distclean: clean
 	rm -rf $(VENV_DIR)

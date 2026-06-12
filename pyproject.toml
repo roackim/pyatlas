@@ -34,6 +34,7 @@ pyatlas = { path = ".", editable = true, extras = ["git"] }
 
 [tool.pixi.tasks]
 tests = "pytest tests/"
+test = "pyatlas -i test/test_data -o test/test_output"
 
 
 [tool.pixi.dependencies]

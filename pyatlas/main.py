@@ -9,6 +9,10 @@ from pyatlas.parse_jsons import extract_sheet_infos
 from pyatlas.solver import solve_placement
 from pyatlas.types import AnimationLine, SpriteSheet
 
+from pyatlas.core import log
+from pyatlas.core.monitor import Chrono
+
+from time import sleep
 
 def normalize_key_part(value: str) -> str:
     lowered = value.strip().lower()
@@ -76,14 +80,17 @@ def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Atlas compositor")
 
     parser.add_argument("-i", "--input_folder", type=str, required=True, help="Path to the input folder")
-    parser.add_argument("-r", "--res_output_folder", type=str, default="output", help="Path to the resource output folder")
+    parser.add_argument("-o", "--output_folder", type=str, default="output", help="Path to the resource output folder")
     parser.add_argument("-m", "--manifest_name", type=str, default="atlas_regions.lua", help="Lua manifest filename")
 
     args = parser.parse_args(argv)
     
-    input_dir  = Path(args.input_folder)
-    res_output_dir = Path(args.res_output_folder)
+    input_dir  = Path(args.input_folder).resolve()
+    output_dir = Path(args.output_folder).resolve()
     manifest_name = args.manifest_name
+    
+    # for i in log.pbar(range(10), prefix="Checking pbar ..."):
+        # sleep(0.1)
     
     
     if not input_dir.is_dir():
@@ -94,46 +101,60 @@ def main(argv: list[str] | None = None) -> None:
         raise RuntimeError(f"no .ase/.aseprite files found in '{input_dir}'")
     
     with TemporaryDirectory() as tmp_dir:
-        
-        tmp_dir = Path(tmp_dir)
-    
-        sprite_sheets = []
-        for ase in source_ase:
-            rel = ase.relative_to(input_dir)
-            tmp_base = (tmp_dir / rel).with_suffix("")
-            tmp_base.parent.mkdir(parents=True, exist_ok=True)
-
-            png = tmp_base.with_suffix(".png")
-            json = tmp_base.with_suffix(".json")
-
-            command = [
-                "aseprite",
-                "-b",
-                "--all-layers",
-                "--split-layers",
-                "--list-tags",
-                str(ase),
-                "--sheet",
-                str(png),
-                "--data",
-                str(json),
-            ]
-            subprocess.run(command, check=True)
-
-            key_stem = build_sheet_key(input_dir, ase)
-            sprite = extract_sheet_infos(json, png, key_stem=key_stem, source_stem=ase.stem)
-            if not sprite.layers:
-                print(f"\033[93mWARNING: skipping {ase}: no layers prefixed with '#'\033[0m")
-                continue
-
-            sprite_sheets.extend(split_sprite_sheet_regions(sprite))
+        with Chrono("Exporting aseprite files"):
             
-        if not sprite_sheets:
-            print("warning: no exportable layers found (layers must start with '#')")
+            tmp_dir = Path(tmp_dir)
+        
+            sprite_sheets = []
+            
+            for ase in log.pbar(source_ase, prefix="Processing Aseprite files"):
+                
+                rel = ase.relative_to(input_dir)
+                tmp_base = (tmp_dir / rel).with_suffix("")
+                tmp_base.parent.mkdir(parents=True, exist_ok=True)
 
-        config = solve_placement(sprite_sheets)
-        compose_atlas(sprite_sheets, config, res_output_dir)
-        export_regions_lua(sprite_sheets, res_output_dir, manifest_name=manifest_name)
+                png = tmp_base.with_suffix(".png")
+                json = tmp_base.with_suffix(".json")
+
+                command = [
+                    "aseprite",
+                    "-b",
+                    "--all-layers",
+                    "--split-layers",
+                    "--list-tags",
+                    str(ase),
+                    "--sheet",
+                    str(png),
+                    "--data",
+                    str(json),
+                ]
+                subprocess.run(command, check=True)
+
+                key_stem = build_sheet_key(input_dir, ase)
+                sprite = extract_sheet_infos(json, png, key_stem=key_stem, source_stem=ase.stem)
+                if not sprite.layers:
+                    print(f"\033[93mWARNING: skipping {ase}: no layers prefixed with '#'\033[0m")
+                    continue
+
+                sprite_sheets.extend(split_sprite_sheet_regions(sprite))
+                
+            if not sprite_sheets:
+                print("warning: no exportable layers found (layers must start with '#')")
+
+        log.disp()
+        with Chrono("Solving atlas layout"):
+            log.info(f"Placing {len(sprite_sheets)} sprite sheets into atlas...")
+            config = solve_placement(sprite_sheets)
+        
+        log.disp()
+        with Chrono("Compositing atlas"):
+            log.info(f"Composing atlas with {config['chunks_w']}x{config['chunks_h']} chunks...")
+            compose_atlas(sprite_sheets, config, output_dir)
+        
+        log.disp()
+        with Chrono("Exporting Lua manifest"):
+            log.info(f"Exporting Lua manifest '{manifest_name}'...")
+            export_regions_lua(sprite_sheets, output_dir, manifest_name=manifest_name)
         
 
 if __name__ == "__main__":
