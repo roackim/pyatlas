@@ -68,7 +68,7 @@ def split_sprite_sheet_regions(sprite: SpriteSheet) -> list[SpriteSheet]:
         # Attach metadata to the first unit only to avoid duplicate exports
         if i == 0:
             unit.points = sprite.points
-            unit.hitboxes = sprite.hitboxes
+            unit.boxes = sprite.boxes
             unit.layer_order = sprite.layer_order
 
         split_units.append(unit)

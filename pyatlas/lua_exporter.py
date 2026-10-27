@@ -11,14 +11,17 @@ LUA_KEYWORDS = {
 }
 
 
-def _format_lua_key(key: str) -> str:
+def _format_lua_key(key) -> str:
+    if isinstance(key, int):
+        return f"[{key}]"
     if re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", key) and key not in LUA_KEYWORDS:
         return key
     return f'["{key}"]'
 
 
-def _set_nested(tree: dict, dotted_key: str, value: dict):
-    parts = dotted_key.split(".")
+def _set_nested(tree: dict, key: str | list[str], value):
+    """Insert value at a dotted path, or at an explicit list of parts (for keys that contain dots)."""
+    parts = key.split(".") if isinstance(key, str) else key
     cursor = tree
     for part in parts[:-1]:
         if part not in cursor:
@@ -99,45 +102,27 @@ def _hoist_durations_ms(value):
 
     processed = {k: _hoist_durations_ms(v) for k, v in value.items()}
 
-    # Every child must be a dict that contains durations_ms
-    if not processed or not all(isinstance(v, dict) and "_durations_ms" in v for v in processed.values()):
+    # Every child (metadata aside) must be a dict that contains durations_ms
+    children = {k: v for k, v in processed.items() if k != "_metadata"}
+    if not children or not all(isinstance(v, dict) and "_durations_ms" in v for v in children.values()):
         return processed
 
     # All durations_ms must be identical
-    all_durations = [v["_durations_ms"] for v in processed.values()]
+    all_durations = [v["_durations_ms"] for v in children.values()]
     if not all(d == all_durations[0] for d in all_durations[1:]):
         return processed
 
     # Hoist: put durations_ms on parent, remove from each child
     result = {"_durations_ms": all_durations[0]}
-    for k, v in processed.items():
+    if "_metadata" in processed:
+        result["_metadata"] = processed["_metadata"]
+    for k, v in children.items():
         result[k] = {ck: cv for ck, cv in v.items() if ck != "_durations_ms"}
     return result
 
 
-def _collapse_constants(value):
-    """Recursively collapse dicts where all values are identical into {const = value}."""
-    if not isinstance(value, dict):
-        return value
-    
-    # First, recursively process all children
-    processed = {k: _collapse_constants(v) for k, v in value.items()}
-    
-    # Check if all values in this dict are identical dicts (deep equality)
-    if len(processed) > 1:
-        values = list(processed.values())
-        first = values[0]
-        
-        # Only collapse if all values are dicts and are identical
-        if isinstance(first, dict) and all(v == first for v in values[1:]):
-            return {"const": first}
-    
-    return processed
-
-
-def export_regions_lua(sprite_sheet_list: list[SpriteSheet], output_dir: Path, manifest_name: str = "atlas_regions.lua"):
-    output_dir.mkdir(parents=True, exist_ok=True)
-
+def build_manifest_tree(sprite_sheet_list: list[SpriteSheet]) -> dict:
+    """Nested regions + metadata tree, as written under `regions` in the Lua manifest."""
     for sp in sprite_sheet_list:
         sp.compute()
 
@@ -167,10 +152,13 @@ def export_regions_lua(sprite_sheet_list: list[SpriteSheet], output_dir: Path, m
         _set_nested(nested_regions, key, val)
 
     # Hoist identical durations_ms arrays from sibling layers to their parent group
-    nested_regions = _hoist_durations_ms(nested_regions)
+    return _hoist_durations_ms(nested_regions)
 
-    # Collapse constant values in metadata sections
-    nested_regions = _collapse_constants(nested_regions)
+
+def export_regions_lua(sprite_sheet_list: list[SpriteSheet], output_dir: Path, manifest_name: str = "atlas_regions.lua"):
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    nested_regions = build_manifest_tree(sprite_sheet_list)
 
     content = "return " + _to_lua({"atlas": "atlas_texture.png", "regions": nested_regions}, 0) + "\n"
 

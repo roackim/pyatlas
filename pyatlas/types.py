@@ -49,16 +49,21 @@ class AnimationLine:
         
 
 class PointMeta:
-    def __init__(self, name: str):
-        self.name = normalize_key_part(name)
+    """Per-frame point of one label in one state. None marks a frame where the label is absent."""
+    def __init__(self, label: str):
+        self.label = label
         self.frames = []
 
-    def add_frame(self, cx: float, cy: float):
-        self.frames.append({"x": cx, "y": cy})
+    def add_frame(self, cx, cy):
+        if cx is None:
+            self.frames.append(None)
+        else:
+            self.frames.append({"x": cx, "y": cy})
 
 class HitboxMeta:
-    def __init__(self, name: str):
-        self.name = normalize_key_part(name)
+    """Per-frame box of one label in one state. None marks a frame where the label is absent."""
+    def __init__(self, label: str):
+        self.label = label
         self.frames = []
 
     def add_frame(self, x, y, w, h):
@@ -67,13 +72,27 @@ class HitboxMeta:
         else:
             self.frames.append({"x": x, "y": y, "w": w, "h": h})
 
+
+def wrap_frames(frames: list):
+    """
+    {const = V} when present with the same value on every frame,
+    {frames = {[i] = V}} (1-based, sparse) otherwise, None when absent on every frame.
+    """
+    if frames and frames[0] is not None and all(f == frames[0] for f in frames[1:]):
+        return {"const": frames[0]}
+    sparse = {i + 1: f for i, f in enumerate(frames) if f is not None}
+    if not sparse:
+        return None
+    return {"frames": sparse}
+
+
 class SpriteSheet:
     def __init__(self, key_stem: str, source_path: Path):
         self.key_stem = key_stem
         self.layers = {}
         self.layer_order = []  
-        self.points = {}
-        self.hitboxes = {}
+        self.points = {}    # state -> label -> PointMeta ("" state = untagged file)
+        self.boxes = {}     # state -> label -> HitboxMeta
         self.total_width  = 0
         self.total_height = 0
         self.blit_ops = []
@@ -105,34 +124,18 @@ class SpriteSheet:
         return items
 
     def meta_items(self):
+        """(path parts, value) pairs. Labels may contain dots, so paths are lists, never dotted strings."""
+        stem = self.key_stem.split(".")
         items = []
         if self.layer_order and self.layer_order != ["auto"]:
-            items.append((f"{self.key_stem}._metadata.z_order", list(self.layer_order)))
+            items.append((stem + ["_metadata", "z_order"], list(self.layer_order)))
 
-        for point_name, pt in self.points.items():
-            # point_name is like "air_down.origin" or just "origin"
-            # Swap to "origin.air_down" for easier access: sprite._metadata.pt.origin.air_down
-            parts = point_name.split(".", 1)
-            if len(parts) == 2:
-                swapped = f"{parts[1]}.{parts[0]}"
-            else:
-                swapped = point_name
-            
-            pts = pt.frames
-            if all(f == pts[0] for f in pts[1:]): pts = pts[0]
-            items.append((f"{self.key_stem}._metadata.pt.{swapped}", pts))
-
-        for hb_name, hb in self.hitboxes.items():
-            # hb_name is like "air_down.hitbox" or just "hitbox"
-            # Swap to "hitbox.air_down" for easier access: sprite._metadata.hb.hitbox.air_down
-            parts = hb_name.split(".", 1)
-            if len(parts) == 2:
-                swapped = f"{parts[1]}.{parts[0]}"
-            else:
-                swapped = hb_name
-            
-            hbs = hb.frames
-            if all(f == hbs[0] for f in hbs[1:]): hbs = hbs[0]
-            items.append((f"{self.key_stem}._metadata.hb.{swapped}", hbs))
+        for kind, per_state in (("boxes", self.boxes), ("points", self.points)):
+            for state, labels in per_state.items():
+                state_path = stem + ([state] if state else [])
+                for label, meta in labels.items():
+                    wrapped = wrap_frames(meta.frames)
+                    if wrapped is not None:
+                        items.append((state_path + ["_metadata", kind, label], wrapped))
 
         return items
